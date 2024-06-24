@@ -32,9 +32,13 @@ def create_db():
     conn = duckdb.connect('./data/database.db')
     c = conn.cursor()
 
+    # create sequence
+    c.execute('''CREATE SEQUENCE IF NOT EXISTS id_seq_analysis START 1''')
+    c.execute('''CREATE SEQUENCE IF NOT EXISTS id_seq_transcription START 1''')
+
     # Create ll_analysis table
     c.execute('''CREATE TABLE IF NOT EXISTS llm_analysis (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id INTEGER DEFAULT nextval('id_seq_analysis') primary key,
                 prompt_text TEXT NOT NULL,
                 llm_params TEXT NOT NULL,
                 output_text TEXT NOT NULL,
@@ -44,7 +48,7 @@ def create_db():
 
     # Create episode transcripts table
     c.execute('''CREATE TABLE IF NOT EXISTS video_transcription (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id INTEGER default nextval('id_seq_transcription') primary key,
                 filename TEXT NOT NULL,
                 transcription TEXT NOT NULL,
                 url TEXT NOT NULL,
