@@ -1,6 +1,6 @@
 import yt_dlp
 import whisper
-import sqlite3
+import duckdb
 from datetime import datetime
 
 
@@ -29,7 +29,7 @@ def create_db():
     """
     Function to create the database and the llm_analysis table.
     """
-    conn = sqlite3.connect('./data/database.db')
+    conn = duckdb.connect('./data/database.db')
     c = conn.cursor()
 
     # Create ll_analysis table
@@ -81,20 +81,20 @@ def insert_video_transcription(filename, transcription, context):
     Returns:
         None
     """
-    conn = sqlite3.connect('./data/database.db')
+    conn = duckdb.connect('./data/database.db')
     c = conn.cursor()
-    sql = """INSERT INTO video_transcription (filename, transcription, url) 
+    sql = """INSERT INTO video_transcription (filename, transcription, url)
     VALUES (?, ?, ?)"""
     c.execute(sql, (filename, transcription, context))
     conn.commit()
     conn.close()
-    
+
 def insert_llm_analysis(prompt_text, llm_params, output_text, output_stats=None, context=None):
     conn = None
 
     try:
         # Connect to the database and create a cursor object
-        conn = sqlite3.connect('data/database.db')
+        conn = duckdb.connect('data/database.db')
         c = conn.cursor()
 
         # Prepare and execute the SQL command
@@ -104,21 +104,10 @@ def insert_llm_analysis(prompt_text, llm_params, output_text, output_stats=None,
         # Commit changes to the database
         conn.commit()
 
-    except sqlite3.Error as e:
+    except duckdb.Error as e:
         print(f"An error occurred: {e}")
-    
+
     finally:
         if conn:
             # Close the connection
             conn.close()
-
-# if __name__ == '__main__':
-
-#     # youtube_to_m4a(["https://www.youtube.com/watch?v=j5Hb9Iii2CA","https://www.youtube.com/watch?v=c5ew5R9DTDc&t=2705s"])
-
-#     # create_amit_db()
-
-#     for item in ["data/market_open_030824.m4a","data/market_close_030824.m4a"]:
-#         m4a_file = item
-#         result = m4a_to_text(m4a_file)
-#         insert_video_transcription(m4a_file, result, "https://www.youtube.com/watch?v=j5Hb9Iii2CA//https://www.youtube.com/watch?v=c5ew5R9DTDc&t=2705s")

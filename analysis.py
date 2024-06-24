@@ -1,3 +1,4 @@
+import duckdb
 from langchain import OpenAI
 from langchain.chains.summarize import load_summarize_chain
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -64,9 +65,11 @@ if __name__ == '__main__':
         temperature=0, 
     )
 
+
     # get transcripts
-    conn = sqlite3.connect('data/database.db')  
-    df = pd.read_sql_query("SELECT * FROM video_transcription where id=2", conn)  # replace 'my_table' with your actual table name
+    conn = duckdb.connect('data/database.db')
+    query = "SELECT * FROM video_transcription where id=2"
+    df = conn.execute(query).fetchdf()
     transcriptions = df['transcription'].tolist()
     conn.close()
     print(f"Transcriptions: {len(transcriptions)}")
