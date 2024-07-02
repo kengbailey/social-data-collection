@@ -7,7 +7,7 @@ from datetime import datetime
 
 # Initialize API key and video ID
 API_KEY = 'AIzaSyDlokwxbeONWQloqemW2GqILztqBtZBmBs'
-VIDEO_ID = 'kjtbpWS-EjI'
+VIDEO_ID = 'uvsNJ9k9zdc'
 
 # Build the YouTube client
 youtube = build('youtube', 'v3', developerKey=API_KEY)
@@ -16,6 +16,7 @@ youtube = build('youtube', 'v3', developerKey=API_KEY)
 conn = psycopg2.connect(database="social-data", user='syran', password='sk8erb01', host='192.168.8.116')
 cur = conn.cursor()
 
+# Fetch topLevel comments only
 def get_video_comment_data(service, **kwargs):
     comment_data = []  # List to hold tuples for batch insert
     
@@ -39,7 +40,7 @@ def get_video_comment_data(service, **kwargs):
     return comment_data
 
 # Get comments (you can adjust the parameters as needed)
-video_comments = get_video_comment_data(youtube, part='snippet', videoId=VIDEO_ID, textFormat='plainText', maxResults=10)
+video_comments = get_video_comment_data(youtube, part='snippet', videoId=VIDEO_ID, textFormat='plainText')
 
 # Assuming video_comments is a list of tuples in the format (video_id, author, text, published_at)
 if video_comments:
@@ -53,12 +54,3 @@ conn.close()
 
 # fin
 print("inserted ", len(video_comments), " comments")
-
-
-
-
-###
-# todo
-# 1. create table for youtube audios that link to files in s3 location - DONE
-# 2. create table for comments on those videos ... ALTER existing table - DONE
-
