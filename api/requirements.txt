@@ -1,0 +1,6 @@
+fastapi 
+fastapi-cors
+uvicorn
+minio
+yt-dlp
+sse-starlette==0.10.0
