@@ -38,11 +38,12 @@ def youtube_to_m4a(url):
     return os.path.join('./data', files[-1])
 
 # Upload to MinIO
-def upload_to_minio(file_path):
+def upload_to_minio(file_path, cleanup=True):
     bucket_name = "social-data"
     object_name = os.path.basename(file_path)    
     minio_client.fput_object(bucket_name, object_name, file_path)
-    os.remove(file_path)  # cleanup
+    if cleanup:
+        os.remove(file_path)  # cleanup
 
     print("File uploaded successfully to MinIO")
     return f"s3://{bucket_name}/{object_name}"
@@ -94,9 +95,9 @@ def log_to_db(video_info, s3_path):
 
 
 if __name__ == "__main__":
-    url = 'https://www.youtube.com/watch?v=uvsNJ9k9zdc'
+    url = 'https://www.youtube.com/watch?v=v1RtgAbltQs'
     file_path = youtube_to_m4a(url)
-    s3_path = upload_to_minio(file_path)
+    s3_path = upload_to_minio(file_path, cleanup=False)
     video_info = get_video_info(url)
     log_to_db(video_info, s3_path)
     print("Done!")
