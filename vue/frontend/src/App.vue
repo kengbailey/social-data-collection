@@ -6,15 +6,33 @@ import { RouterLink, RouterView } from 'vue-router'
   <v-app>
     <v-main>
       <v-container>
+
+        <!-- Download a Video -->
         <v-text-field
           v-model="videoUrl"
           label="YouTube URL"
           @keyup.enter="downloadAudio"
         ></v-text-field>
-        <v-btn @click="downloadAudio" color="primary">Download Audio</v-btn>
-        <v-alert v-if="message" :type="alertType" class="mt-4">
-          {{ message }}
-        </v-alert>
+        
+        <!-- <v-row justify="center">
+          <v-col cols="auto">
+            <v-btn @click="downloadAudio" color="primary">Download</v-btn>
+          </v-col>
+        </v-row> -->
+        
+                
+        
+
+        <!-- Downloaded Videos -->
+        <h2 class="mt-12 custom-header">Downloaded</h2>
+        <v-data-table
+          :headers="headers"
+          :items="items"
+          :items-per-page="5"
+          class="elevation-1 mt-4"
+          hide-default-footer
+          hide-default-header
+        ></v-data-table>
       </v-container>
     </v-main>
   </v-app>
@@ -22,6 +40,8 @@ import { RouterLink, RouterView } from 'vue-router'
 
 <script>
 import axios from 'axios';
+import { toast } from "vue3-toastify";
+import "vue3-toastify/dist/index.css";
 
 export default {
   data() {
@@ -29,45 +49,59 @@ export default {
       videoUrl: '',
       message: '',
       alertType: 'info',
+      isDownloading: false,
+      items: [],
+      headers: [
+        { text: 'File Name', value: 'name' },
+        { text: 'Last Modified', value: 'last_modified' },
+      ],
     };
   },
   methods: {
     async downloadAudio() {
+      this.isDownloading = true;
       try {
         const response = await axios.post('http://localhost:8000/download', { url: this.videoUrl });
-        this.message = response.data.message;
-        this.alertType = 'info';
-        this.listenForCompletion();
+        toast(response.data.message, {
+          "theme": "auto",
+          "type": "success",
+          "position": "bottom-left",
+          "transition": "slide",
+          "dangerouslyHTMLString": true
+        })
+        
       } catch (error) {
         console.error('Error:', error);
         this.message = 'Error starting download';
         this.alertType = 'error';
+      } finally {
+        this.isDownloading = false;
       }
     },
-    listenForCompletion() {
-      const eventSource = new EventSource('http://localhost:8000/status');
-      
-      eventSource.onmessage = (event) => {
-        this.message = event.data;
-        this.alertType = 'success';
-        eventSource.close();
-      };
-
-      eventSource.onerror = (error) => {
-        console.error('EventSource failed:', error);
-        this.message = 'Error listening for updates';
-        this.alertType = 'error';
-        eventSource.close();
-      };
-
-      // Close the connection after a timeout (e.g., 5 minutes)
-      setTimeout(() => {
-        if (eventSource.readyState !== EventSource.CLOSED) {
-          console.log('Closing EventSource after timeout');
-          eventSource.close();
-        }
-      }, 300000); // 5 minutes
+    async getLatestItems() {
+      try {
+        const response = await axios.get('http://localhost:8000/get_latest');
+        console.log(response)
+        this.items = response.data.items.map((item, index) => ({
+          name: item,
+          last_modified: new Date(response.data.items_last_modified[index]).toLocaleString(), // Convert to JavaScript Date and then format
+        }));
+      } catch (error) {
+        console.error('Error getting latest items:', error);
+      }
     },
   },
+  created() {
+    this.getLatestItems();
+    setInterval(this.getLatestItems, 5000);
+  }
 };
 </script>
+
+<style scoped>
+.custom-header {
+  font-weight: normal;
+  font-size: large;
+  text-decoration: underline; /* to add underlining */
+}
+</style>
