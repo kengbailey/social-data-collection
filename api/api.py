@@ -1,11 +1,11 @@
-from fastapi import FastAPI, BackgroundTasks
+from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import yt_dlp
 from minio import Minio
+from operator import attrgetter
 import os
-from sse_starlette.sse import EventSourceResponse
-import asyncio
+
 
 # FastiAPI setup
 app = FastAPI()
@@ -24,9 +24,25 @@ minio_client = Minio("192.168.8.116:9000",
     secure=False,
 )
 
+
+####################
+## Youtube to M4a
+####################
+
 class VideoURL(BaseModel):
     url: str
 
+# Endpoint - /download
+@app.post("/download")
+async def download_audio(video: VideoURL, background_tasks: BackgroundTasks):
+    background_tasks.add_task(process_video, video.url)
+    return {"message": "Download started..."}
+
+def process_video(url):
+    file_path = youtube_to_m4a(url)
+    upload_to_minio(file_path)
+
+# Download the audio
 def youtube_to_m4a(url):
     ydl_opts = {
         'format': 'm4a/bestaudio/best',
@@ -43,20 +59,7 @@ def youtube_to_m4a(url):
     files = os.listdir('./data')
     return os.path.join('./data', files[-1])
 
-@app.post("/download")
-async def download_audio(video: VideoURL, background_tasks: BackgroundTasks):
-    background_tasks.add_task(process_video, video.url)
-    return {"message": "Download started"}
-
-def process_video(url):
-    # Download the audio
-    file_path = youtube_to_m4a(url)
-    upload_to_minio(file_path)
-
-    # Send message to UI (implementation depends on your frontend setup)
-    global task_complete
-    task_complete = True
-
+# Upload to MinIO
 def upload_to_minio(file_path):
     bucket_name = "social-data"
     object_name = os.path.basename(file_path)
@@ -65,21 +68,21 @@ def upload_to_minio(file_path):
     os.remove(file_path)  # Clean up the local file after upload
     print("File uploaded successfully to MinIO")
 
-@app.get("/status")
-async def status_stream(request):
-    async def event_generator():
-        while True:
-            if await request.is_disconnected():
-                break
+# Get latest downloads
+@app.get("/get_latest")
+async def get_latest_bucket_items():
+    bucket_name = "social-data"
+    try:
+        items = get_latest_items(bucket_name)
+        return {
+            "bucket": bucket_name, 
+            "items": [item._object_name for item in items],
+            "items_last_modified": [item._last_modified for item in items]
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-            # Check if the task is complete
-            if task_complete:
-                yield {
-                    "event": "message",
-                    "data": "Audio file uploaded to MinIO"
-                }
-                break
-
-            await asyncio.sleep(1)
-
-    return EventSourceResponse(event_generator())
+def get_latest_items(bucket_name, num_items=5):
+    objects = minio_client.list_objects(bucket_name)
+    sorted_objects = sorted([obj for obj in objects], key=attrgetter('last_modified'), reverse=True)
+    return sorted_objects[:num_items]
