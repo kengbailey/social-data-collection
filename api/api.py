@@ -4,6 +4,9 @@ from pydantic import BaseModel
 import yt_dlp
 from minio import Minio
 from operator import attrgetter
+import tempfile
+import whisper
+
 import os
 
 
@@ -86,3 +89,44 @@ def get_latest_items(bucket_name, num_items=5):
     objects = minio_client.list_objects(bucket_name)
     sorted_objects = sorted([obj for obj in objects], key=attrgetter('last_modified'), reverse=True)
     return sorted_objects[:num_items]
+
+
+####################
+## Audio To Text
+####################
+
+class AudioURL(BaseModel):
+    s3_url: str
+
+@app.post("/transcribe")
+async def transcribe_audio(audio: AudioURL, background_tasks: BackgroundTasks):
+    background_tasks.add_task(process_video, audio.url)
+    return {"message": "Download started..."}
+
+def process_audio(url):
+    # fetch audio from s3
+    temp_file = fetch_s3_file(url)
+    # transcribe audio
+    transcribed_audio = transcribe_audio(temp_file)
+    # log transcription to database
+    # TODO: finish this function 
+
+# Fetches a file from an S3 URL and saves it to a temporary directory
+def fetch_s3_file(s3_url: str) -> str:
+    # Extract bucket name and object key from the S3 URL
+    bucket_name, object_key = s3_url[5:].split("/", 1)  
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_file_path = f"{temp_dir}/{object_key.split('/')[-1]}"
+        minio_client.download_object(bucket_name, object_key, temp_file_path)
+        return temp_file_path
+
+# Transcribes an audio file locally using OpenAI Whisper.
+def transcribe_audio(audio_file_path: str, model_name="base.en") -> str:
+    model = whisper.load_model(model_name)
+    audio = whisper.load_audio(audio_file_path)
+    result = model.transcribe(audio)
+
+    return result["text"]
+
+
